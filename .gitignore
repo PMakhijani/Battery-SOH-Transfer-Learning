@@ -1,0 +1,21 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Large Datasets (GitHub limit is 100MB)
+MIT/*.mat
+Calce Data/**/*.xlsx
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+check_results.py

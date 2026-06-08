@@ -1,0 +1,5 @@
+# Random notes
+- Remember to run phase 1 before 2
+- Model sometimes crashes, idk why
+- Data loading takes forever
+- TODO: clean up code later
