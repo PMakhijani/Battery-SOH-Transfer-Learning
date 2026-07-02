@@ -225,8 +225,8 @@ st.markdown("---")
 st.subheader("🔋 Cell-Level Granular Metrics (BQ76920 Front-End Resolution)")
 c1, c2, c3, c4 = st.columns(4)
 
-v_min = 2.5 if "LFP" in chemistry_mode else 3.0
-v_max = 3.6 if "LFP" in chemistry_mode else 4.2
+v_min = 3.0
+v_max = 4.5
 
 cells_data = zip([c1, c2, c3, c4], range(4), v_cells, soh_cells)
 for col, idx, v, soh in cells_data:
