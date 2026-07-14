@@ -1,6 +1,6 @@
 # Battery Health Stuff with ML
 **ES 665 – Advanced Transport Electrification | IIT G**  
-Rohan & Piyush
+Piyush Makhijani
 
 ---
 
@@ -52,19 +52,20 @@ python run_pipeline.py
 ---
 
 ## Project Structure
-```
+```text
 ATET/
-├── src/
-│   ├── data_pipeline.py     # 4-channel preprocessing (V, I, T, dQ/dV)
-│   ├── model.py             # 2-layer Bi-LSTM with sigmoid output
-│   ├── train_lfp.py         # Phase 1: LFP pre-training
-│   ├── transfer_nmc.py      # Phase 2: Transfer learning to NMC
-│   ├── evaluate.py          # Metrics (MAE/RMSE/MAPE/R²) + 7 plots
-│   └── thermal_augment.py   # Arrhenius thermal stress simulation
+├── code_stuff/              # Training and evaluation scripts (LFP pre-training, NMC transfer, etc.)
+├── src/                     # Edge deployment and core pipelines
+│   ├── edge_suite.py        # Edge device deployment suite
+│   └── test_edge_suite.py   # Edge suite unit tests
 ├── models/                  # Saved .h5 model weights + scalers
-├── results/figures/         # 7 generated plots (PNG)
+├── results/figures/         # Generated plots (PNG) and results
 ├── MIT/                     # MIT-Stanford LFP .mat file
 ├── Calce Data/              # CALCE NMC .xlsx files
+├── check_results.py         # Script to evaluate and verify current metrics
+├── dashboard.py             # Main visualization dashboard
+├── srip_dashboard.py        # SRIP-specific visualization dashboard
+├── uart_processor.py        # UART data processing for edge data
 ├── run_pipeline.py          # End-to-end runner
 └── requirements.txt
 ```
