@@ -3,6 +3,10 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import time
+import socket
+import json
+import threading
+from tensorflow.keras.models import load_model
 from datetime import datetime
 
 import os
@@ -41,6 +45,64 @@ def load_calce_virtual_data():
 # Load the virtual dataset into memory
 VIRTUAL_DATA = load_calce_virtual_data()
 MAX_ROWS = len(VIRTUAL_DATA)
+
+
+# ==============================================================================
+# AI MODEL INITIALIZATION
+# ==============================================================================
+@st.cache_resource
+def load_ai_brain():
+    """Loads the fine-tuned NMC model into active memory."""
+    try:
+        return load_model("models/transferred_nmc.h5")
+    except Exception as e:
+        st.error(f"Model load failed: {e}")
+        return None
+
+# Initialize the AI
+AI_MODEL = load_ai_brain()
+
+
+# ==============================================================================
+# EDGE-TO-FOG UDP LISTENER
+# ==============================================================================
+@st.cache_resource
+def start_udp_listener():
+    """Spawns a background daemon thread to catch live telemetry from the Jetson."""
+    latest_data = {
+        "v_cells": [0.0, 0.0, 0.0, 0.0],
+        "current": 0.0,
+        "temp": 25.0,
+        "connected": False
+    }
+    
+    def listen():
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # 0.0.0.0 tells Windows to listen on ALL network adapters, including the USB-C bridge
+        sock.bind(("0.0.0.0", 5005)) 
+        sock.settimeout(1.0)
+        
+        while True:
+            try:
+                data, addr = sock.recvfrom(1024)
+                payload = json.loads(data.decode('utf-8'))
+                
+                latest_data["v_cells"] = payload["v_cells"]
+                latest_data["current"] = payload["current"]
+                latest_data["temp"] = payload["temp"]
+                latest_data["connected"] = True
+            except socket.timeout:
+                latest_data["connected"] = False
+            except Exception:
+                pass
+
+    # Start it as a daemon so it dies cleanly when you close the dashboard
+    thread = threading.Thread(target=listen, daemon=True)
+    thread.start()
+    return latest_data
+
+# Initialize the live data catcher
+LIVE_HARDWARE_DATA = start_udp_listener()
 
 
 # ==============================================================================
@@ -97,27 +159,24 @@ st.markdown("""
 
 def generate_wltp_step(step, chemistry):
     if chemistry == "LFP (Live Hardware Mode)":
-        # --- FULL LFP SYNTHETIC BLOCK (The 'pass' is gone!) ---
-        t = step * 0.5
-        base_v = 3.25
-        v_noise = 0.03 * np.sin(t) + 0.008 * np.cos(2.5 * t)
-        base_soh = [94.2, 93.8, 89.1, 94.0] 
-        temp_base = 27.5
-
-        current = -12.0 * np.sin(0.4 * t) - 4.0 * np.cos(1.1 * t)
-        if current > 0: current *= 0.4 
+        # --- CATCH THE LIVE UDP HARDWARE STREAM ---
+        if LIVE_HARDWARE_DATA["connected"]:
+            v_cells = LIVE_HARDWARE_DATA["v_cells"]
+            current = LIVE_HARDWARE_DATA["current"]
+            temp = LIVE_HARDWARE_DATA["temp"]
+        else:
+            # Fallback if Jetson is disconnected or stopped streaming
+            v_cells = [0.0, 0.0, 0.0, 0.0]
+            current = 0.0
+            temp = 0.0
+            
+        # Dummy AI predictions until the rolling buffer is implemented
+        base_soh = [92.1, 91.8, 91.0, 92.0] 
         
-        v_cells = [
-            base_v + v_noise + (current * 0.002),
-            base_v + v_noise * 1.01 + (current * 0.0021),
-            base_v + v_noise * 0.95 + (current * 0.0038),
-            base_v + v_noise * 0.99 + (current * 0.0019)
-        ]
-        temp = temp_base + (current**2 * 0.006)
         return v_cells, current, temp, base_soh
         
     else:
-        # --- TRUE HIL NMC MODE ---
+        # --- TRUE HIL NMC MODE (VIRTUAL DATASET) ---
         row_idx = step % MAX_ROWS 
         
         # Read the exact row from the CALCE dataset
@@ -127,7 +186,9 @@ def generate_wltp_step(step, chemistry):
         
         # Distribute the real pack voltage across the 4 cell displays
         v_cells = [real_v, real_v * 0.99, real_v * 1.01, real_v * 0.98] 
-        base_soh = [91.5, 91.2, 90.8, 91.4] 
+        
+        # Dummy AI predictions here too for now
+        base_soh = [92.1, 91.8, 91.0, 92.0] 
         
         return v_cells, current, temp, base_soh
 

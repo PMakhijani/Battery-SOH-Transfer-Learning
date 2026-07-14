@@ -1,6 +1,8 @@
 import serial
 import time
 import numpy as np
+import socket
+import json
 
 class UartBmsReceiver:
     def __init__(self, port='/dev/ttyUSB0', baudrate=115200, timeout=1.0):
@@ -68,18 +70,46 @@ class UartBmsReceiver:
             self.serial_conn.close()
             print("[INFO] Serial connection closed.")
 
-# --- Quick Test Block ---
+
+
+# --- UDP Broadcaster Block ---
 if __name__ == "__main__":
-    # If testing on Windows, change to "COM3" or similar.
-    # On Jetson Nano, it's usually "/dev/ttyUSB0" or "/dev/ttyACM0"
-    receiver = UartBmsReceiver(port='COM3') 
+    import socket
+    import json
+    
+    # Network Setup: 192.168.55.100 is the default Windows IP when connected to Jetson via USB-C
+    UDP_IP = "192.168.55.100" 
+    UDP_PORT = 5005
+    
+    # Create the UDP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    
+    # Hardware Setup: Change port if needed (Jetson is usually /dev/ttyUSB0 or /dev/ttyACM0)
+    receiver = UartBmsReceiver(port='/dev/ttyUSB0') 
     
     if receiver.connect():
-        print("Listening for STM32 data... (Press Ctrl+C to stop)")
+        print(f"Streaming BMS telemetry to {UDP_IP}:{UDP_PORT}... (Press Ctrl+C to stop)")
         try:
             while True:
+                # 1. Grab the latest hardware numbers
                 v, i, t = receiver.read_latest_packet()
-                print(f"V: {v} | I: {i}A | T: {t}°C")
-                time.sleep(0.05) # Loop at 50ms to match inference budget
+                
+                # 2. Package it into a lightweight JSON dictionary
+                payload = json.dumps({
+                    "v_cells": v, 
+                    "current": i, 
+                    "temp": t
+                })
+                
+                # 3. Fire it over the network bridge
+                sock.sendto(payload.encode('utf-8'), (UDP_IP, UDP_PORT))
+                
+                # 4. Print locally just so you can see it working on the Jetson monitor
+                print(f"SENT -> V: {v} | I: {i}A | T: {t}°C")
+                
+                time.sleep(0.05) # 50ms loop
+                
         except KeyboardInterrupt:
             receiver.close()
+            sock.close()
+            print("\n[INFO] UDP Stream stopped.")
